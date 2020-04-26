@@ -12,7 +12,7 @@ asmlinkage void sys_time_estimate(int start_flag, int pid, struct timespec* star
 	}else{
 		//Use start_time as start time and then get current time and then print them
 		getnstimeofday(&cur_time);
-		printk("[Project1] %d %lu.%lu %lu.%lu", pid, start_time->tv_sec, start_time->tv_nsec, cur_time.tv_sec, cur_time.tv_nsec);
+		printk("[Project1] %d %lu.%09lu %lu.%09lu", pid, start_time->tv_sec, start_time->tv_nsec, cur_time.tv_sec, cur_time.tv_nsec);
 		return;
 	}
 }
