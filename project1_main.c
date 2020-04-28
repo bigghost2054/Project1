@@ -108,6 +108,9 @@ int main(int argc, char** argv){
 
 	//Free allocated memory
 	free(processes);
+
+	//Clean dmesg buffer
+	system("echo  | sudo tee /dev/kmsg");
 	return 0;
 }
 
@@ -452,7 +455,7 @@ int run_process(process* process_to_start, int cur_time, int unit){
 		struct sched_param param;
 
 		//RESUME
-		printf("Resumed process %s at time %d\n", process_to_start->name, cur_time);
+		//printf("Resumed process %s at time %d\n", process_to_start->name, cur_time);
 		
 		param.sched_priority = 0;
 		sched_setscheduler(process_to_start->pid, SCHED_OTHER, &param);
@@ -461,14 +464,13 @@ int run_process(process* process_to_start, int cur_time, int unit){
 	}else if (process_to_start->state == PSTATE_READY){
 		//START
 		int pid;
-		printf("Start process %s at time %d\n", process_to_start->name, cur_time);
+		//printf("Start process %s at time %d\n", process_to_start->name, cur_time);
 	
 		pid = fork();
 		if (pid < 0){
 			//ERROR
 		}else if (pid == 0){
 			struct timespec start_time;
-
 			//CHILD PROCESS
 			//PRINT YOURSELF :)
 			printf("%s %d\n", process_to_start->name, getpid());
@@ -476,10 +478,11 @@ int run_process(process* process_to_start, int cur_time, int unit){
 			//Do Something
 			//
 			for (int j = 0; j < unit; j++){
-				for (int i = 0; i < 1000000UL; i++);
+				{volatile unsigned long i; for (i = 0; i < 1000000UL; i++);}
 			}
 			//Get end time
 			syscall(334, 0, getpid(), &start_time);
+			//printf("%s %d %d(END)\n", process_to_start->name, getpid(), unit);
 			exit(0);
 
 		}else{
@@ -488,7 +491,7 @@ int run_process(process* process_to_start, int cur_time, int unit){
 			cpu_set_t mask;
 			CPU_ZERO(&mask);
 			CPU_SET(CHILD_CPU, &mask);
-			sched_setaffinity(getpid(), sizeof(mask), &mask);
+			sched_setaffinity(pid, sizeof(mask), &mask);
 
 			process_to_start->pid = pid;
 
@@ -507,7 +510,7 @@ int preempt_process(process* process_to_preempt, int cur_time){
 		struct sched_param param;
 
 		//PREEMPT
-		printf("Preempt process %s at time %d\n", process_to_preempt->name, cur_time);
+		//printf("Preempt process %s at time %d\n", process_to_preempt->name, cur_time);
 		
 		param.sched_priority = 0;
 		sched_setscheduler(process_to_preempt->pid, SCHED_IDLE, &param);
@@ -520,7 +523,7 @@ int preempt_process(process* process_to_preempt, int cur_time){
 int finish_process(process* process_to_finish, int cur_time){
 	if (process_to_finish->state == PSTATE_RUNNING){
 		//FINISH the process
-		printf("Finish process %s at time %d\n", process_to_finish->name, cur_time);
+		//printf("Finish process %s at time %d\n", process_to_finish->name, cur_time);
 		waitpid(process_to_finish->pid, NULL, 0);
 	}else{
 		//ERROR ==> NOT MAKING SENSE
