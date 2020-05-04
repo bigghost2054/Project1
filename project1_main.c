@@ -35,6 +35,7 @@ typedef struct process{
 	int execution_time; //Y
 	int time_to_ready; //max(X - current_time, 0)
 	int time_to_finish_execution; //max(Y - time_executed, 0)
+	int request_cpu_time; //For RR Only
 }process;
 
 int do_scheduling(int policy_code, int num_processes, process* processes);
@@ -98,6 +99,9 @@ int main(int argc, char** argv){
 		//Initialize time to ready and time to finish execution
 		processes[i].time_to_ready = processes[i].ready_time;
 		processes[i].time_to_finish_execution = processes[i].execution_time;
+
+		//
+		processes[i].request_cpu_time = processes[i].ready_time;
 		
 		//printf("%s\n",processes[i].name);
 	}
@@ -322,7 +326,11 @@ void check_and_run_processes(int policy_code, int* running_process_idx, int last
 	int idx_shortest_process;
 	int shortest_time;
 
+	//FOR RR Only
 	int found_next_process_to_run; //FOR RR ONLY
+	int cur_shortest_request_time;
+	int cur_process_to_run;
+
 	switch(policy_code){
 		case POLICY_FIFO:
 			for (int i = 0; i < num_processes; i++){
@@ -349,6 +357,49 @@ void check_and_run_processes(int policy_code, int* running_process_idx, int last
 			found_next_process_to_run = 0;
 			idx_first_process_ready_to_run = -1;
 			idx_last_process_ready_to_run = -1;
+
+			//Find the next process to run
+			cur_shortest_request_time = -1;
+			cur_process_to_run = -1;
+			for (int i = 0; i < num_processes; i++){
+				if ((processes[i].state == PSTATE_READY) || (processes[i].state == PSTATE_PAUSED)){
+					if ((cur_shortest_request_time == -1) || (cur_shortest_request_time > processes[i].request_cpu_time)){
+						found_next_process_to_run = 1;
+						cur_shortest_request_time = processes[i].request_cpu_time;
+						cur_process_to_run = i;
+					}
+				}
+			}
+
+			if (*running_process_idx == -1){
+				if (cur_process_to_run != -1){
+					//Run process [cur_process_to_run] (the first process ready to run)
+					run_process(&(processes[cur_process_to_run]), cur_time, processes[cur_process_to_run].execution_time);
+								
+					processes[cur_process_to_run].state = PSTATE_RUNNING;
+					*running_process_idx = cur_process_to_run;
+					break;
+				}
+			}else{
+				if (cur_process_to_run != -1){
+					//You found something else process to run
+					//PAUSE process[*running_process_idx]
+					preempt_process(&(processes[*running_process_idx]), cur_time);
+					processes[*running_process_idx].state = PSTATE_PAUSED;
+					//Request CPU next round
+					processes[*running_process_idx].request_cpu_time = cur_time;
+					
+					//Run process [cur_process_to_run]
+					run_process(&(processes[cur_process_to_run]), cur_time, processes[cur_process_to_run].execution_time);
+					processes[cur_process_to_run].state = PSTATE_RUNNING;
+					*running_process_idx = cur_process_to_run;
+					break;
+				}else{
+					//You cannot find something else process to run ==> keep this process running
+				}
+			}
+
+			/*
 			for (int i = 0; i < num_processes; i++){
 				if ((processes[i].state == PSTATE_READY) || (processes[i].state == PSTATE_PAUSED)){
 					if (idx_first_process_ready_to_run == -1){
@@ -397,7 +448,7 @@ void check_and_run_processes(int policy_code, int* running_process_idx, int last
 					//If new process is the same as the process for preempting (If only one process need to execute) --> SKIP, and let it go
 				}
 				
-			}
+			}*/
 			break;
 
 		case POLICY_SJF:
